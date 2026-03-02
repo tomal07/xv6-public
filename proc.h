@@ -1,3 +1,5 @@
+#include "spinlock.h"
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -32,7 +34,12 @@ struct context {
   uint eip;
 };
 
-enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE, THREAD_ZOMBIE };
+
+struct ftlock {
+  struct spinlock lock;         // Lock
+  struct file *ofile[NOFILE];   // Open files
+};
 
 // Per-process state
 struct proc {
@@ -41,14 +48,17 @@ struct proc {
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
   int pid;                     // Process ID
+  int tid;                     // Thread ID
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
   void *chan;                  // If non-zero, sleeping on chan
   int killed;                  // If non-zero, have been killed
-  struct file *ofile[NOFILE];  // Open files
+  struct ftlock *ft;           // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  void *retval;                // Return value from thread
+  struct proc *joined;         // If someone already called `thread_join` on this thread
 };
 
 // Process memory is laid out contiguously, low addresses first:

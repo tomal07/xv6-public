@@ -120,6 +120,12 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            freeproc(struct proc *p);
+pde_t*          kill_other_threads_and_switch_pgdir(pde_t*);
+int             thread_create(void (*)(void), void*, int, void (*)(uint));
+void            thread_exit(void*);
+int             thread_join(int, void**);
+void            allocprocfiletable(struct proc*);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

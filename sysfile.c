@@ -23,11 +23,22 @@ argfd(int n, int *pfd, struct file **pf)
 {
   int fd;
   struct file *f;
+  struct proc *curproc = myproc();
 
   if(argint(n, &fd) < 0)
     return -1;
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+  if(fd < 0 || fd >= NOFILE)
     return -1;
+
+  acquire(&curproc->ft->lock);
+
+  if((f = curproc->ft->ofile[fd]) == 0){
+    release(&curproc->ft->lock);
+    return -1;
+  }
+
+  release(&curproc->ft->lock);
+
   if(pfd)
     *pfd = fd;
   if(pf)
@@ -42,13 +53,18 @@ fdalloc(struct file *f)
 {
   int fd;
   struct proc *curproc = myproc();
+  
+  acquire(&curproc->ft->lock);
 
   for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd] == 0){
-      curproc->ofile[fd] = f;
+    if(curproc->ft->ofile[fd] == 0){
+      curproc->ft->ofile[fd] = f;
+      release(&curproc->ft->lock);
       return fd;
     }
   }
+
+  release(&curproc->ft->lock);  
   return -1;
 }
 
@@ -95,10 +111,13 @@ sys_close(void)
 {
   int fd;
   struct file *f;
-
+  struct proc *curproc = myproc();
   if(argfd(0, &fd, &f) < 0)
     return -1;
-  myproc()->ofile[fd] = 0;
+
+  acquire(&curproc->ft->lock);
+  curproc->ft->ofile[fd] = 0;
+  release(&curproc->ft->lock);
   fileclose(f);
   return 0;
 }
@@ -425,6 +444,7 @@ sys_pipe(void)
   int *fd;
   struct file *rf, *wf;
   int fd0, fd1;
+  struct proc *curproc = myproc();
 
   if(argptr(0, (void*)&fd, 2*sizeof(fd[0])) < 0)
     return -1;
@@ -432,8 +452,11 @@ sys_pipe(void)
     return -1;
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
-    if(fd0 >= 0)
-      myproc()->ofile[fd0] = 0;
+    if(fd0 >= 0){
+      acquire(&curproc->ft->lock);
+      curproc->ft->ofile[fd0] = 0;
+      release(&curproc->ft->lock);
+    }
     fileclose(rf);
     fileclose(wf);
     return -1;
