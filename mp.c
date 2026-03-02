@@ -80,10 +80,13 @@ mpconfig(struct mp **pmp)
   conf = (struct mpconf*) P2V((uint) mp->physaddr);
   if(memcmp(conf, "PCMP", 4) != 0)
     return 0;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds="
   if(conf->version != 1 && conf->version != 4)
     return 0;
   if(sum((uchar*)conf, conf->length) != 0)
     return 0;
+#pragma GCC diagnostic pop
   *pmp = mp;
   return conf;
 }
@@ -101,8 +104,11 @@ mpinit(void)
   if((conf = mpconfig(&mp)) == 0)
     panic("Expect to run on an SMP");
   ismp = 1;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds="
   lapic = (uint*)conf->lapicaddr;
   for(p=(uchar*)(conf+1), e=(uchar*)conf+conf->length; p<e; ){
+#pragma GCC diagnostic pop
     switch(*p){
     case MPPROC:
       proc = (struct mpproc*)p;
