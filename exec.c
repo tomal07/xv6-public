@@ -87,14 +87,20 @@ exec(char *path, char **argv)
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
 
+  // Commit to the user image.
+  if(killotherthreads() == -1)
+    goto bad;
+
+  // Past this point there are no other threads (the only one is this one) - no fear of changing shared resources.
+
   // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
 
-  // Commit to the user image.
-  oldpgdir = kill_other_threads_and_switch_pgdir(pgdir);
+  oldpgdir = curproc->pgdir;
+  curproc->pgdir = pgdir;
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;

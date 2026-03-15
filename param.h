@@ -1,6 +1,6 @@
 #define NTHREADS      8                     // maximum number of threads each process group can have
 #define NPROCGRPS     64                    // maximum number of process groups, each one can have up to NTHREADS threads
-#define NPROC         (NTHREADS*NPROCGRPS)  // maximum number of process groups, each one can have up to NTHREADS threads
+#define NPROC         (NTHREADS*NPROCGRPS)  // maximum number of threads in total, the size of the ptable
 #define MIN_PID       1                     // The minimum pid
 #define MAX_PID       NPROCGRPS             // The maximum pid
 #define MIN_TID       1                     // The minumum tid

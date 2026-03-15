@@ -36,29 +36,33 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE, THREAD_ZOMBIE };
 
-struct ftlock {
-  struct spinlock lock;         // Lock
-  struct file *ofile[NOFILE];   // Open files
+// NOT_KILLED - wasn't killed.
+// PROC_KILLED - was killed, and it would result in all the threads exiting.
+// THREAD_KILLED - was killed, and it would result only in that thread exiting.
+enum killedstate { NOT_KILLED = 0, PROC_KILLED, THREAD_KILLED};
+
+struct procfiletable {
+  struct file *ofile[NOFILE];
 };
 
 // Per-process state
 struct proc {
-  uint sz;                     // Size of process memory (bytes)
-  pde_t* pgdir;                // Page table
-  char *kstack;                // Bottom of kernel stack for this process
-  enum procstate state;        // Process state
-  int pid;                     // Process ID
-  int tid;                     // Thread ID
-  struct proc *parent;         // Parent process
-  struct trapframe *tf;        // Trap frame for current syscall
-  struct context *context;     // swtch() here to run process
-  void *chan;                  // If non-zero, sleeping on chan
-  int killed;                  // If non-zero, have been killed
-  struct ftlock *ft;           // Open files
-  struct inode *cwd;           // Current directory
-  char name[16];               // Process name (debugging)
-  void *retval;                // Return value from thread
-  struct proc *joined;         // If someone already called `thread_join` on this thread
+  uint sz;                              // Size of process memory (bytes)
+  pde_t* pgdir;                         // Page table
+  char *kstack;                         // Bottom of kernel stack for this process
+  enum procstate state;                 // Process state
+  int pid;                              // Process ID
+  int tid;                              // Thread ID
+  int ppid;                             // Parent process' process id
+  struct trapframe *tf;                 // Trap frame for current syscall
+  struct context *context;              // swtch() here to run process
+  void *chan;                           // If non-zero, sleeping on chan
+  enum killedstate killed;              // One of killedstate
+  struct procfiletable *procfiletable;  // Open files
+  struct inode **cwd;                   // Current directory
+  char name[16];                        // Process name (debugging)
+  void *retval;                         // Return value from thread
+  struct proc *joined;                  // If someone already called `thread_join` on this thread
 };
 
 // Process memory is laid out contiguously, low addresses first:

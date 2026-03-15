@@ -49,6 +49,7 @@
 #define SLEEP_LARGE_AMOUNT 100
 #define SLEEP_SMALL_AMOUNT 20
 #define SHOULDNT_EXIST_FILE "shouldnt_exist.txt"
+#define ILLEGAL_ADDRESS 0x80000000
 
 // Globals
 int g_secret, g_fd, g_tid, g_pid;
@@ -73,6 +74,14 @@ return_tid(void)
   ASSERT((tid = malloc(sizeof(int))) > 0);
 
   *tid = gettid();
+
+  thread_exit(tid);
+}
+
+void
+thread_exit_illegal_address(void)
+{
+  int *tid = (int*)ILLEGAL_ADDRESS;
 
   thread_exit(tid);
 }
@@ -141,6 +150,52 @@ void sleep_and_create_file(void)
   ASSERT_HANG(close(fd) == 0);
 }
 
+void
+fork_and_thread_exit(void)
+{
+  g_pid = fork();
+  ASSERT(g_pid >= 0);
+
+  if(g_pid == 0){
+    sleep(SLEEP_SMALL_AMOUNT);
+    exit();
+  }
+
+  thread_exit(0);
+}
+
+void
+access_illegal_memory(void)
+{
+  int *addr = (int*)ILLEGAL_ADDRESS;
+  printf(1, "%d\n", *addr);
+}
+
+void
+sleep_and_exit(void)
+{
+  sleep(SLEEP_LARGE_AMOUNT);
+  exit();
+}
+
+void
+spam_link_unlink_close(void)
+{
+  int i;
+  unsigned int x = gettid();
+
+  for(i = 0; i < 100; i++){
+    x = x * 1103515245 + 12345;
+    if((x % 3) == 0){
+      close(open("x", O_RDWR | O_CREATE));
+    } else if((x % 3) == 1){
+      link("cat", "x");
+    } else {
+      unlink("x");
+    }
+  }
+}
+
 // Tests
 void
 verify_different_tids_same_process_group(void)
@@ -166,18 +221,20 @@ illegal_thread_create(void)
 {
   char stack[NORMAL_STACK_SIZE];
 
-  ASSERT(thread_create(0, stack, sizeof(stack)) < 0);           // NULL function.
-  ASSERT(thread_create(empty, 0, sizeof(stack)) < 0);           // NULL stack.
   ASSERT(thread_create(empty, stack, 0) < 0);                   // Zero sized stack.
   ASSERT(thread_create(empty, stack, NORMAL_STACK_SIZE*3) < 0); // Out of bounds stack.
-  ASSERT(thread_create(empty, 0, 0) < 0);                       // NULL stack and zero size for the stack.
-  ASSERT(thread_create(0, 0, 0) < 0);                           // NULL function, stack and zero size.
 }
 
 void
 gettid_twice(void)
 {
   ASSERT(gettid() == gettid());
+}
+
+void
+join_the_current_thread(void)
+{
+  ASSERT(thread_join(gettid(), 0) == -1);
 }
 
 void
@@ -196,6 +253,24 @@ kill_child_with_threads(void)
   
   ASSERT(sleep(SLEEP_SMALL_AMOUNT) == 0); // Sleeping to make the child create the thread before we kill
   ASSERT(kill(pid) == 0);
+  ASSERT(wait() == pid);
+}
+
+void
+exit_without_thread_join(void)
+{
+  char stack[NORMAL_STACK_SIZE];
+  int tid, pid = fork();
+  ASSERT(pid >= 0);
+
+  if(pid == 0){
+    ASSERT((tid = thread_create(empty, stack, sizeof(stack))) > 0);
+    exit();
+  }
+  
+  // Sleeping to make the child create the thread before we kill
+  ASSERT(sleep(SLEEP_SMALL_AMOUNT) == 0);
+
   ASSERT(wait() == pid);
 }
 
@@ -232,7 +307,19 @@ fork_wait_in_parent_thread_exit_in_child(void)
 }
 
 void
-return_tid_from_thread()
+wait_in_another_thread_after_parent_thread_died(void)
+{
+  char stack[NORMAL_STACK_SIZE];
+  int tid;
+
+  ASSERT((tid = thread_create(fork_and_thread_exit, stack, sizeof(stack))) > 0);
+  ASSERT(thread_join(tid, 0) == tid);
+
+  ASSERT(wait() == g_pid);
+}
+
+void
+return_tid_from_thread(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid, *rettid;
@@ -246,7 +333,18 @@ return_tid_from_thread()
 }
 
 void
-read_and_change_global_in_thread()
+thread_exit_illegal_address_from_thread(void)
+{
+  char stack[NORMAL_STACK_SIZE];
+  int tid, *rettid;
+
+  ASSERT((tid = thread_create(thread_exit_illegal_address, stack, sizeof(stack))) > 0);
+  ASSERT(thread_join(tid, (void**)&rettid) == tid);
+  ASSERT(rettid == (int*)ILLEGAL_ADDRESS);
+}
+
+void
+read_and_change_global_in_thread(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid;
@@ -294,7 +392,7 @@ unable_to_write_after_close_in_thread(void)
 }
 
 void
-check_pid_overflow()
+check_pid_overflow(void)
 {
   int i, pid, ourpid;
 
@@ -312,7 +410,7 @@ check_pid_overflow()
 }
 
 void
-check_tid_overflow()
+check_tid_overflow(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int i, tid;
@@ -332,19 +430,24 @@ void
 max_threads(void)
 {
   int tids[NTHREADS - 1];
-  int n, tid;
+  int random_index = (NTHREADS - 1) / 2;
+  int n;
   char *stack = malloc(SMALL_STACK_SIZE * (NTHREADS - 1));
 
   ASSERT(stack);
 
   memset(tids, 0, sizeof(tids));
 
-  // Create as many threads as possible. Theoretically it should be (NTHREADS - 1) additional threads assuming one current thread,
-  // but that may depend on how this program is run.
-  for(n = 0; n < NTHREADS - 1; n++){
-    ASSERT((tid = thread_create(empty, stack + (n * SMALL_STACK_SIZE), SMALL_STACK_SIZE)) > 0);
-    tids[n] = tid;
-  }
+  for(n = 0; n < NTHREADS - 1; n++)
+    ASSERT((tids[n] = thread_create(empty, stack + (n * SMALL_STACK_SIZE), SMALL_STACK_SIZE)) > 0);
+
+  // We should have reached the max, so creating new ones shouldn't succeed.
+  ASSERT(thread_create(empty, stack + (n * SMALL_STACK_SIZE), SMALL_STACK_SIZE) < 0);
+
+  // Join some random thread, and create again in order to check if "holes" in the tid can be filled.
+  // The tid of the new thread should be the same as the one joined as we are at full capacity before the join.
+  ASSERT(thread_join(tids[random_index], 0) == tids[random_index]);
+  ASSERT(thread_create(empty, stack + (random_index * SMALL_STACK_SIZE), SMALL_STACK_SIZE) == tids[random_index]);
 
   // Check that we can join all the threads that were created.
   for(; n > 0; n--)
@@ -354,7 +457,7 @@ max_threads(void)
 }
 
 void
-chdir_in_thread()
+chdir_in_thread(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid;
@@ -375,9 +478,9 @@ chdir_in_thread()
   ASSERT((tid = thread_create(chdir_to_dir1, stack, sizeof(stack))) > 0);
   ASSERT(thread_join(tid, 0) == tid);
 
-  // Thread should have chdir-ed to DIR1, but accessing DIR2 should still fail and DIR1 succeed as threads don't share their cwd.
-  ASSERT(stat(DIR1, &st) == 0);
-  ASSERT(stat(DIR2, &st) < 0);
+  // Thread should have chdir-ed to DIR1, so accessing DIR2 should work but accessing DIR1 fail, as threads share their cwd.
+  ASSERT(stat(DIR1, &st) < 0);
+  ASSERT(stat(DIR2, &st) == 0);
 
   // Clean.
   ASSERT(chdir("/") >= 0);
@@ -386,7 +489,7 @@ chdir_in_thread()
 }
 
 void
-join_same_thread_twice_when_its_still_running()
+join_same_thread_twice_when_its_still_running(void)
 {
   char stack1[NORMAL_STACK_SIZE];
   char stack2[NORMAL_STACK_SIZE];
@@ -405,7 +508,7 @@ join_same_thread_twice_when_its_still_running()
 }
 
 void
-join_twice()
+join_twice(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid;
@@ -416,7 +519,7 @@ join_twice()
 }
 
 void
-child_cant_join_parent_thread()
+child_cant_join_parent_thread(void)
 {
   int tid, pid;
   char stack[NORMAL_STACK_SIZE];
@@ -436,7 +539,7 @@ child_cant_join_parent_thread()
 }
 
 void
-check_different_fds_across_threads()
+check_different_fds_across_threads(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid, fd;
@@ -452,7 +555,7 @@ check_different_fds_across_threads()
 }
 
 void
-check_threads_share_max_open_files_amount()
+check_threads_share_max_open_files_amount(void)
 {
   char stack[NORMAL_STACK_SIZE];
   int tid, fd;
@@ -489,7 +592,8 @@ check_threads_share_max_open_files_amount()
       ASSERT(close(fds[i - 1]) == 0);
 }
 
-void create_thread_and_call_exec()
+void
+create_thread_and_call_exec(void)
 {
   char stack[NORMAL_STACK_SIZE];
   struct stat st;
@@ -519,6 +623,64 @@ void create_thread_and_call_exec()
     unlink(SHOULDNT_EXIST_FILE);
 }
 
+void
+access_illegal_memory_in_thread(void)
+{
+  char stack[NORMAL_STACK_SIZE];
+  int tid;
+
+  printf(1, "NOTE: trap 14 is expected bellow\n");
+
+  ASSERT((tid = thread_create(access_illegal_memory, stack, sizeof(stack))) > 0);
+  ASSERT(thread_join(tid, 0) == tid);
+}
+
+void
+wait_and_exit(void)
+{
+  char stack[NORMAL_STACK_SIZE];
+  int tid, pid1, pid2;
+
+  ASSERT((pid1 = fork()) >= 0);
+  if(pid1 == 0){    
+    ASSERT_HANG((pid2 = fork()) >= 0);
+    if(pid2 == 0){
+      for(;;){}
+    }
+
+    ASSERT_HANG((tid = thread_create(sleep_and_exit, stack, sizeof(stack))) > 0);
+
+    wait();
+    ASSERT_HANG(0); // Shouldn't have reached here.
+  }
+
+  ASSERT(wait() == pid1);
+}
+
+// Like usertests' linkunlink test, but with threads instead of procs.
+void
+linkunlink(void)
+{
+  int tids[NTHREADS - 1];
+  int n;
+  char *stack;
+
+  stack = malloc(SMALL_STACK_SIZE * (NTHREADS - 1));
+  ASSERT(stack);
+
+  memset(tids, 0, sizeof(tids));
+
+  unlink("x");
+
+  for(n = 0; n < NTHREADS - 1; n++)
+    ASSERT((tids[n] = thread_create(spam_link_unlink_close, stack + (n * SMALL_STACK_SIZE), SMALL_STACK_SIZE)) > 0);
+
+  for(; n > 0; n--)
+    ASSERT(thread_join(tids[n-1], 0) == tids[n-1]);
+
+  free(stack);
+}
+
 int
 main(void)
 {
@@ -527,10 +689,14 @@ main(void)
   TEST(verify_different_tids_same_process_group);
   TEST(illegal_thread_create);
   TEST(gettid_twice);
+  TEST(join_the_current_thread);
   TEST(kill_child_with_threads);
+  TEST(exit_without_thread_join);
   TEST(fork_and_wait_in_thread);
   TEST(fork_wait_in_parent_thread_exit_in_child);
+  TEST(wait_in_another_thread_after_parent_thread_died);
   TEST(return_tid_from_thread);
+  TEST(thread_exit_illegal_address_from_thread);
   TEST(read_and_change_global_in_thread);
   TEST(open_global_fd_and_write_in_thread);
   TEST(unable_to_write_after_close_in_thread);
@@ -544,6 +710,9 @@ main(void)
   TEST(check_different_fds_across_threads);
   TEST(check_threads_share_max_open_files_amount);
   TEST(create_thread_and_call_exec);
+  TEST(access_illegal_memory_in_thread);
+  TEST(wait_and_exit);
+  TEST(linkunlink);
 
   printf(1, PARTYPOPPER " All tests passed " PARTYPOPPER "\n");
 

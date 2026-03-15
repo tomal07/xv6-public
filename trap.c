@@ -32,17 +32,27 @@ idtinit(void)
   lidt(idt, sizeof(idt));
 }
 
+void
+exitifkilled(void)
+{
+  enum killedstate killed = myproc()->killed;
+
+  if(killed == PROC_KILLED)
+    exit();
+  
+  if(killed == THREAD_KILLED)
+    thread_exit(0);
+}
+
 //PAGEBREAK: 41
 void
 trap(struct trapframe *tf)
 {
   if(tf->trapno == T_SYSCALL){
-    if(myproc()->killed)
-      exit();
+    exitifkilled();
     myproc()->tf = tf;
     syscall();
-    if(myproc()->killed)
-      exit();
+    exitifkilled();
     return;
   }
 
@@ -87,18 +97,21 @@ trap(struct trapframe *tf)
       panic("trap");
     }
     // In user space, assume process misbehaved.
-    cprintf("pid %d tid %d %s: trap %d err %d on cpu %d "
-            "eip 0x%x addr 0x%x--kill proc\n",
-            myproc()->pid, myproc()->tid, myproc()->name, tf->trapno,
-            tf->err, cpuid(), tf->eip, rcr2());
-    myproc()->killed = 1;
+    // In case it tried to access `thread_exit`, don't print an error as it could be
+    // a legitimate way to exit a thread, see `thread_create`.
+    if (!(tf->trapno == T_PGFLT && rcr2() == (uint)thread_exit))
+      cprintf("pid %d tid %d %s: trap %d err %d on cpu %d "
+              "eip 0x%x addr 0x%x--kill thread\n",
+              myproc()->pid, myproc()->tid, myproc()->name, tf->trapno,
+              tf->err, cpuid(), tf->eip, rcr2());
+    myproc()->killed = THREAD_KILLED;
   }
 
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
-    exit();
+    exitifkilled();
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
@@ -108,5 +121,5 @@ trap(struct trapframe *tf)
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
-    exit();
+    exitifkilled();
 }

@@ -121,11 +121,14 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 void            freeproc(struct proc *p);
-pde_t*          kill_other_threads_and_switch_pgdir(pde_t*);
-int             thread_create(void (*)(void), void*, int, void (*)(uint));
+int             killotherthreads(void);
+int             thread_create(void (*)(void), void*, int);
 void            thread_exit(void*);
 int             thread_join(int, void**);
-void            allocprocfiletable(struct proc*);
+void            proclock(void);
+void            procrelease(void);
+int             validaddr(void*, int);
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);

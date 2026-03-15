@@ -106,18 +106,3 @@ memmove(void *vdst, const void *vsrc, int n)
     *dst++ = *src++;
   return vdst;
 }
-
-void
-thread_function_wrapper(uint func)
-{
-  ((void (*)(void))func)();
-  thread_exit(0);
-}
-
-// A user-space wrapper around the syscall, which specifies exit as the function to run
-// after func returns
-int
-thread_create(void (*func)(void), void *tstack, int stacksize)
-{
-  return thread_create_sys(func, tstack, stacksize, thread_function_wrapper);
-}

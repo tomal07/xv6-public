@@ -30,14 +30,14 @@ argfd(int n, int *pfd, struct file **pf)
   if(fd < 0 || fd >= NOFILE)
     return -1;
 
-  acquire(&curproc->ft->lock);
+  proclock();
 
-  if((f = curproc->ft->ofile[fd]) == 0){
-    release(&curproc->ft->lock);
+  if((f = curproc->procfiletable->ofile[fd]) == 0){
+    procrelease();
     return -1;
   }
 
-  release(&curproc->ft->lock);
+  procrelease();
 
   if(pfd)
     *pfd = fd;
@@ -54,17 +54,17 @@ fdalloc(struct file *f)
   int fd;
   struct proc *curproc = myproc();
   
-  acquire(&curproc->ft->lock);
+  proclock();
 
   for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ft->ofile[fd] == 0){
-      curproc->ft->ofile[fd] = f;
-      release(&curproc->ft->lock);
+    if(curproc->procfiletable->ofile[fd] == 0){
+      curproc->procfiletable->ofile[fd] = f;
+      procrelease();
       return fd;
     }
   }
 
-  release(&curproc->ft->lock);  
+  procrelease();
   return -1;
 }
 
@@ -115,9 +115,9 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
 
-  acquire(&curproc->ft->lock);
-  curproc->ft->ofile[fd] = 0;
-  release(&curproc->ft->lock);
+  proclock();
+  curproc->procfiletable->ofile[fd] = 0;
+  procrelease();
   fileclose(f);
   return 0;
 }
@@ -406,9 +406,11 @@ sys_chdir(void)
     return -1;
   }
   iunlock(ip);
-  iput(curproc->cwd);
+  proclock();
+  iput(*curproc->cwd);
+  *curproc->cwd = ip;
+  procrelease();
   end_op();
-  curproc->cwd = ip;
   return 0;
 }
 
@@ -453,9 +455,9 @@ sys_pipe(void)
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0){
-      acquire(&curproc->ft->lock);
-      curproc->ft->ofile[fd0] = 0;
-      release(&curproc->ft->lock);
+      proclock();
+      curproc->procfiletable->ofile[fd0] = 0;
+      procrelease();
     }
     fileclose(rf);
     fileclose(wf);

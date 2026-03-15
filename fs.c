@@ -20,6 +20,7 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "memlayout.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
@@ -469,7 +470,25 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
+
+    proclock();
+    // This function is called from inside the kernel, to read into
+    // kernel-spaced-addressed buffers (see exec).
+    // In such cases, the address won't be legitimate for the process,
+    // so `validaddr` would return false. It's fine to skip checking the address
+    // if it is inside the kernel's address space, as the `dst` itself didn't change
+    // from checking it in `argptr`, so if the user space supplied a kernel space address
+    // we wouldn't even reach here.
+    if((uint)dst < KERNBASE && !validaddr(dst, m)){
+      procrelease();
+      brelse(bp);
+      return -1;
+    }
+
     memmove(dst, bp->data + off%BSIZE, m);
+
+    procrelease();
+
     brelse(bp);
   }
   return n;
@@ -498,7 +517,18 @@ writei(struct inode *ip, char *src, uint off, uint n)
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
+
+    proclock();
+    if((uint)src < KERNBASE && !validaddr(src, m)){
+      procrelease();
+      brelse(bp);
+      return -1;
+    }
+
     memmove(bp->data + off%BSIZE, src, m);
+
+    procrelease();
+
     log_write(bp);
     brelse(bp);
   }
@@ -526,6 +556,7 @@ dirlookup(struct inode *dp, char *name, uint *poff)
 {
   uint off, inum;
   struct dirent de;
+  int checkaddr = ((uint)name < KERNBASE);
 
   if(dp->type != T_DIR)
     panic("dirlookup not DIR");
@@ -535,13 +566,27 @@ dirlookup(struct inode *dp, char *name, uint *poff)
       panic("dirlookup read");
     if(de.inum == 0)
       continue;
+
+    if(checkaddr)
+      proclock();
+
+    if(checkaddr && !validaddr(name, DIRSIZ)){
+      procrelease();
+      return 0;
+    }
+
     if(namecmp(name, de.name) == 0){
+      if(checkaddr)
+        procrelease();
       // entry matches path element
       if(poff)
         *poff = off;
       inum = de.inum;
       return iget(dp->dev, inum);
     }
+
+    if(checkaddr)
+      procrelease();
   }
 
   return 0;
@@ -554,9 +599,24 @@ dirlink(struct inode *dp, char *name, uint inum)
   int off;
   struct dirent de;
   struct inode *ip;
+  char namecpy[DIRSIZ];
+  int checkaddr = ((uint)name < KERNBASE);
+
+  if(checkaddr)
+    proclock();
+
+  if(checkaddr && !validaddr(name, DIRSIZ)){
+    procrelease();
+    return -1;
+  }
+
+  strncpy(namecpy, name, DIRSIZ);
+
+  if(checkaddr)
+    procrelease();
 
   // Check that name is not present.
-  if((ip = dirlookup(dp, name, 0)) != 0){
+  if((ip = dirlookup(dp, namecpy, 0)) != 0){
     iput(ip);
     return -1;
   }
@@ -569,7 +629,7 @@ dirlink(struct inode *dp, char *name, uint inum)
       break;
   }
 
-  strncpy(de.name, name, DIRSIZ);
+  strncpy(de.name, namecpy, DIRSIZ);
   de.inum = inum;
   if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
     panic("dirlink");
@@ -597,14 +657,36 @@ skipelem(char *path, char *name)
 {
   char *s;
   int len;
+  int checkaddr = ((uint)path < KERNBASE);
 
-  while(*path == '/')
-    path++;
-  if(*path == 0)
+  if(checkaddr)
+    proclock();
+
+  if(checkaddr && !validaddr(path, sizeof(char))){
+    procrelease();
     return 0;
-  s = path;
-  while(*path != '/' && *path != 0)
+  }
+
+  while(*path == '/'){
     path++;
+    if(checkaddr && !validaddr(path, sizeof(char))){
+      procrelease();
+      return 0;
+    }
+  }
+  if(*path == 0){
+    if(checkaddr)
+      procrelease();
+    return 0;
+  }
+  s = path;
+  while(*path != '/' && *path != 0){
+    path++;
+    if(checkaddr && !validaddr(path, sizeof(char))){
+      procrelease();
+      return 0;
+    }
+  }
   len = path - s;
   if(len >= DIRSIZ)
     memmove(name, s, DIRSIZ);
@@ -612,8 +694,17 @@ skipelem(char *path, char *name)
     memmove(name, s, len);
     name[len] = 0;
   }
-  while(*path == '/')
+  while(*path == '/'){
     path++;
+    if(checkaddr && !validaddr(path, sizeof(char))){
+      procrelease();
+      return 0;
+    }
+  }
+
+  if(checkaddr)
+    procrelease();
+
   return path;
 }
 
@@ -624,12 +715,37 @@ skipelem(char *path, char *name)
 static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
-  struct inode *ip, *next;
+  struct inode *ip, *next, *cwd;
+  int leadingslash, checkaddr = ((uint)path < KERNBASE);
 
-  if(*path == '/')
+  if(checkaddr)
+    proclock();
+
+  if(checkaddr && !validaddr(path, sizeof(char))){
+    procrelease();
+    return 0;
+  }
+
+  leadingslash = (*path == '/');
+
+  if(checkaddr)
+    procrelease();
+
+  if(leadingslash){
     ip = iget(ROOTDEV, ROOTINO);
-  else
-    ip = idup(myproc()->cwd);
+  } else{
+    // Even if the path is not in a kernel space address, we need to lock because we access cwd.
+    // But only lock if it's not already locked.
+    if(!checkaddr)
+      proclock();
+
+    cwd = *myproc()->cwd;
+
+    if(!checkaddr)
+      procrelease();
+
+    ip = idup(cwd);
+  }
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
@@ -637,11 +753,26 @@ namex(char *path, int nameiparent, char *name)
       iunlockput(ip);
       return 0;
     }
+
+    if(checkaddr)
+      proclock();
+
+    if(checkaddr && !validaddr(path, sizeof(char))){
+      procrelease();
+      return 0;
+    }
+
     if(nameiparent && *path == '\0'){
       // Stop one level early.
+      if(checkaddr)
+        procrelease();
       iunlock(ip);
       return ip;
     }
+
+    if(checkaddr)
+      procrelease();
+
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
       return 0;

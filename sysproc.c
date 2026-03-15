@@ -50,9 +50,16 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
+
+  proclock();
+
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if(growproc(n) < 0){
+    procrelease();
     return -1;
+  }
+
+  procrelease();
   return addr;
 }
 
@@ -96,15 +103,13 @@ sys_thread_create(void)
   void (*func) (void);
   void *tstack;
   int stacksize;
-  void (*wrapper) (uint);
 
   if(argptr(0, (void*)&func, sizeof(void*)) < 0 ||
      argint(2, &stacksize) < 0 ||
-     argptr(1, (void*)&tstack, stacksize) < 0 ||
-     argptr(3, (void*)&wrapper, sizeof(void*)) < 0)
+     argptr(1, (void*)&tstack, stacksize) < 0)
     return -1;
 
-  return thread_create(func, tstack, stacksize, wrapper);
+  return thread_create(func, tstack, stacksize);
 }
 
 int
@@ -112,7 +117,7 @@ sys_thread_exit(void)
 {
   void *ret;
 
-  if(argptr(0, (void*)&ret, sizeof(void*)) < 0)
+  if(argint(0, (void*)&ret) < 0)
     return -1;
 
   thread_exit(ret);
