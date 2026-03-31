@@ -596,6 +596,8 @@ killotherthreads(void)
     if(p->pid == curproc->pid && p != curproc){
       tids[n++] = p->tid;
       p->killed = THREAD_KILLED;
+      if(p->state == SLEEPING)
+        p->state = RUNNABLE;
     }
   }
 

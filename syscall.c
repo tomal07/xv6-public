@@ -130,33 +130,49 @@ extern int sys_thread_create(void);
 extern int sys_thread_exit(void);
 extern int sys_thread_join(void);
 extern int sys_gettid(void);
+extern int sys_counting_sem_init(void);
+extern int sys_counting_sem_wait(void);
+extern int sys_counting_sem_post(void);
+extern int sys_counting_sem_destroy(void);
+extern int sys_binary_sem_init(void);
+extern int sys_binary_sem_wait(void);
+extern int sys_binary_sem_post(void);
+extern int sys_binary_sem_destroy(void);
 
 static int (*syscalls[])(void) = {
-[SYS_fork]            sys_fork,
-[SYS_exit]            sys_exit,
-[SYS_wait]            sys_wait,
-[SYS_pipe]            sys_pipe,
-[SYS_read]            sys_read,
-[SYS_kill]            sys_kill,
-[SYS_exec]            sys_exec,
-[SYS_fstat]           sys_fstat,
-[SYS_chdir]           sys_chdir,
-[SYS_dup]             sys_dup,
-[SYS_getpid]          sys_getpid,
-[SYS_sbrk]            sys_sbrk,
-[SYS_sleep]           sys_sleep,
-[SYS_uptime]          sys_uptime,
-[SYS_open]            sys_open,
-[SYS_write]           sys_write,
-[SYS_mknod]           sys_mknod,
-[SYS_unlink]          sys_unlink,
-[SYS_link]            sys_link,
-[SYS_mkdir]           sys_mkdir,
-[SYS_close]           sys_close,
-[SYS_thread_create]   sys_thread_create,
-[SYS_thread_exit]     sys_thread_exit,
-[SYS_thread_join]     sys_thread_join,
-[SYS_gettid]          sys_gettid,
+[SYS_fork]                  sys_fork,
+[SYS_exit]                  sys_exit,
+[SYS_wait]                  sys_wait,
+[SYS_pipe]                  sys_pipe,
+[SYS_read]                  sys_read,
+[SYS_kill]                  sys_kill,
+[SYS_exec]                  sys_exec,
+[SYS_fstat]                 sys_fstat,
+[SYS_chdir]                 sys_chdir,
+[SYS_dup]                   sys_dup,
+[SYS_getpid]                sys_getpid,
+[SYS_sbrk]                  sys_sbrk,
+[SYS_sleep]                 sys_sleep,
+[SYS_uptime]                sys_uptime,
+[SYS_open]                  sys_open,
+[SYS_write]                 sys_write,
+[SYS_mknod]                 sys_mknod,
+[SYS_unlink]                sys_unlink,
+[SYS_link]                  sys_link,
+[SYS_mkdir]                 sys_mkdir,
+[SYS_close]                 sys_close,
+[SYS_thread_create]         sys_thread_create,
+[SYS_thread_exit]           sys_thread_exit,
+[SYS_thread_join]           sys_thread_join,
+[SYS_gettid]                sys_gettid,
+[SYS_counting_sem_init]     sys_counting_sem_init,
+[SYS_counting_sem_wait]     sys_counting_sem_wait,
+[SYS_counting_sem_post]     sys_counting_sem_post,
+[SYS_counting_sem_destroy]  sys_counting_sem_destroy,
+[SYS_binary_sem_init]       sys_binary_sem_init,
+[SYS_binary_sem_wait]       sys_binary_sem_wait,
+[SYS_binary_sem_post]       sys_binary_sem_post,
+[SYS_binary_sem_destroy]    sys_binary_sem_destroy,
 };
 
 void

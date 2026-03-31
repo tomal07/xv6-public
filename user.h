@@ -27,6 +27,14 @@ int thread_create(void (*)(void), void*, int);
 void thread_exit(void*);
 int thread_join(int, void**);
 int gettid();
+int counting_sem_init(int);
+int counting_sem_wait(int);
+int counting_sem_post(int);
+int counting_sem_destroy(int);
+int binary_sem_init(int);
+int binary_sem_wait(int);
+int binary_sem_post(int);
+int binary_sem_destroy(int);
 
 // ulib.c
 int stat(const char*, struct stat*);
