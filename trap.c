@@ -101,9 +101,9 @@ trap(struct trapframe *tf)
     // a legitimate way to exit a thread, see `thread_create`.
     if (!(tf->trapno == T_PGFLT && rcr2() == (uint)thread_exit))
       cprintf("pid %d tid %d %s: trap %d err %d on cpu %d "
-              "eip 0x%x addr 0x%x--kill thread\n",
+              "eip 0x%x addr 0x%x--kill thread %d\n",
               myproc()->pid, myproc()->tid, myproc()->name, tf->trapno,
-              tf->err, cpuid(), tf->eip, rcr2());
+              tf->err, cpuid(), tf->eip, rcr2(), myproc()->sz);
     myproc()->killed = THREAD_KILLED;
   }
 

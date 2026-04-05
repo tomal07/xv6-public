@@ -19,3 +19,7 @@
 #define FSSIZE                 2000                   // size of file system in blocks
 #define NSEM                   64                     // number of semaphores
 #define MAX_COUNTING_SEM_COUNT 64                     // max value of the counter of a counting semaphore
+#define MIN_SHM_PAGES          1                      // min amount of pages of shared memory that can be allocated per key
+#define MAX_SHM_PAGES          4                      // max amount of pages of shared memory that can be allocated per key
+#define MIN_SHM_KEY            0                      // min key of shared memory
+#define MAX_SHM_KEY            7                      // max key of shared

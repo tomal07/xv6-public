@@ -16,6 +16,7 @@ OBJS = \
 	pipe.o\
 	proc.o\
 	semaphore.o\
+	shm.o\
 	sleeplock.o\
 	spinlock.o\
 	string.o\
@@ -24,6 +25,7 @@ OBJS = \
 	sysfile.o\
 	sysproc.o\
 	syssemaphore.o\
+	sysshm.o\
 	trapasm.o\
 	trap.o\
 	uart.o\
@@ -173,6 +175,7 @@ UPROGS=\
 	_forktest\
 	_threadtests\
 	_semtests\
+	_shmtests\
 	_thread_exit\
 	_grep\
 	_init\
@@ -253,7 +256,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 # check in that version.
 
 EXTRA=\
-	mkfs.c ulib.c user.h cat.c echo.c forktest.c threadtests.c semtests.c\
+	mkfs.c ulib.c user.h cat.c echo.c forktest.c threadtests.c semtests.c shmtests.c\
 	thread_exit.c grep.c kill.c ln.c ls.c mkdir.c rm.c stressfs.c usertests.c\
 	boundedbuffer.c wc.c zombie.c printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\

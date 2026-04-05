@@ -41,3 +41,5 @@ SYSCALL(binary_sem_init)
 SYSCALL(binary_sem_wait)
 SYSCALL(binary_sem_post)
 SYSCALL(binary_sem_destroy)
+SYSCALL(shmgetat);
+SYSCALL(shm_refcount);

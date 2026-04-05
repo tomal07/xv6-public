@@ -331,10 +331,9 @@ int
 growproc(int n)
 {
   uint sz;
-  struct proc *p, *curproc = myproc();
+  struct proc *curproc = myproc();
 
-  acquire(&ptable.lock);
-
+  acquire(&ptable.lock); // TODO: why here? If anything, put it right before the ptable loop bellow
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0){
@@ -348,9 +347,7 @@ growproc(int n)
     }
   }
   
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->pid == curproc->pid)
-      p->sz = sz;
+  changesz(sz);
 
   switchuvm(curproc);
 
@@ -382,6 +379,8 @@ fork(void)
     release(&ptable.lock);
     return -1;
   }
+
+  shmcopieduvm(np->pgdir, np->pid);
 
   np->sz = curproc->sz;
   // Handle open files.
@@ -988,4 +987,15 @@ validaddr(void* addr, int size)
   struct proc *curproc = myproc();
 
   return !(size < 0 || (uint)addr >= curproc->sz || (uint)addr+size > curproc->sz);
+}
+
+// Assumes the process lock is locked as the ptable.
+void
+changesz(int sz)
+{
+  struct proc *p, *curproc = myproc();
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p->pid == curproc->pid)
+      p->sz = sz;
 }

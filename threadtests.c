@@ -682,7 +682,7 @@ main(void)
   TEST(create_thread_and_call_exec);
   TEST(access_illegal_memory_in_thread);
   TEST(wait_and_exit);
-  TEST(linkunlink);
+  TEST(linkunlink); // TODO: fix
 
   printf(1, PARTYPOPPER " All tests passed " PARTYPOPPER "\n");
 

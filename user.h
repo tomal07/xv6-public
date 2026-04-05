@@ -35,6 +35,8 @@ int binary_sem_init(int);
 int binary_sem_wait(int);
 int binary_sem_post(int);
 int binary_sem_destroy(int);
+int shmgetat(int, int);
+int shm_refcount(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

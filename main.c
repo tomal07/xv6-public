@@ -28,6 +28,7 @@ main(void)
   uartinit();      // serial port
   pinit();         // process table
   seminit();       // sempahores
+  shminit();       // shared memory
   tvinit();        // trap vectors
   binit();         // buffer cache
   fileinit();      // file table

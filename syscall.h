@@ -32,3 +32,5 @@
 #define SYS_binary_sem_wait         31
 #define SYS_binary_sem_post         32
 #define SYS_binary_sem_destroy      33
+#define SYS_shmgetat                34
+#define SYS_shm_refcount            35

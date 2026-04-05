@@ -128,6 +128,7 @@ int             thread_join(int, void**);
 void            proclock(void);
 void            procrelease(void);
 int             validaddr(void*, int);
+void            changesz(int);
 
 
 // swtch.S
@@ -194,6 +195,7 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+int             mappages(pde_t*, void*, uint, uint, int);
 
 // semaphore.c
 void            seminit(void);
@@ -205,6 +207,13 @@ int             binary_sem_init(int);
 int             binary_sem_wait(int);
 int             binary_sem_post(int);
 int             binary_sem_destroy(int);
+
+// shm.c
+void            shminit(void);
+void            shmfreepage(pde_t*, char*);
+void            shmcopieduvm(pde_t*, int);
+int             shmgetat(int, int);
+int             shm_refcount(int);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

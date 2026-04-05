@@ -138,6 +138,8 @@ extern int sys_binary_sem_init(void);
 extern int sys_binary_sem_wait(void);
 extern int sys_binary_sem_post(void);
 extern int sys_binary_sem_destroy(void);
+extern int sys_shmgetat(void);
+extern int sys_shm_refcount(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]                  sys_fork,
@@ -172,7 +174,8 @@ static int (*syscalls[])(void) = {
 [SYS_binary_sem_init]       sys_binary_sem_init,
 [SYS_binary_sem_wait]       sys_binary_sem_wait,
 [SYS_binary_sem_post]       sys_binary_sem_post,
-[SYS_binary_sem_destroy]    sys_binary_sem_destroy,
+[SYS_shmgetat]              sys_shmgetat,
+[SYS_shm_refcount]          sys_shm_refcount,
 };
 
 void
